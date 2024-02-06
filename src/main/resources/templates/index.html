@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="https://www.thymeleaf.org">
+<head>
+    <title>Planning Poker</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}"/>
+    <link rel="stylesheet" th:href="@{/webjars/bootswatch-darkly/bootstrap.min.css}"/>
+    <link rel="stylesheet" th:href="@{/webjars/datatables/css/jquery.dataTables.css}"/>
+</head>
+<body class="bg-dark">
+<div class="container-fluid">
+    <br><br>
+    <div class="row">
+        <div class="col-md-12"><h4 th:text="'Planning Poker - user: '+${username}"></h4></div>
+    </div>
+    <br>
+    <HR>
+    <br>
+    <div class="row">
+        <div class="col-md-3" th:text="'ID: '+${ticket.id}">TRSURV-1234</div>
+        <div class="col-md-9" th:text="'Summary: '+${ticket.summary}">Title section of the Jira</div>
+    </div>
+    <br><br>
+    <div class="row">
+        <div class="col-md-12"><pre th:text="${ticket.description}">Detailed description from the Jira</pre></div>
+    </div>
+    <br><HR><br>
+    <div class="row">
+        <div class="col-md-1">
+            <a class="btn btn-primary" id="prevButton"
+               th:if="${#authentication.name == 'leader'}">prev</a>
+        </div>
+        <div class="col-md-10" ></div>
+        <div class="col-md-1 d-flex justify-content-end">
+            <a class="btn btn-primary" id="nextButton"
+               th:if="${#authentication.name == 'leader'}">next</a>
+        </div>
+    </div>
+    <br><br>
+    <div class="row">
+        <div class="col-md-12 d-flex justify-content-center align-items-center">
+            <H6>VOTE:</H6>&nbsp;&nbsp;
+            <button class="btn btn-primary custom-width" style="width: 50px" th:attr="onclick=|vote(1)|">1</button>&nbsp;
+            <button class="btn btn-primary custom-width" style="width: 50px" th:attr="onclick=|vote(2)|">2</button>&nbsp;
+            <button class="btn btn-primary custom-width" style="width: 50px" th:attr="onclick=|vote(3)|">3</button>&nbsp;
+            <button class="btn btn-primary custom-width" style="width: 50px" th:attr="onclick=|vote(5)|">5</button>&nbsp;
+            <button class="btn btn-primary custom-width" style="width: 50px" th:attr="onclick=|vote(8)|">8</button>&nbsp;
+            <button class="btn btn-primary custom-width" style="width: 50px" th:attr="onclick=|vote(13)|">13</button>&nbsp;
+            <button class="btn btn-primary custom-width" style="width: 50px" th:attr="onclick=|vote(21)|">21</button>&nbsp;
+            <button class="btn btn-primary custom-width" style="width: 50px" th:attr="onclick=|vote(34)|">34</button>&nbsp;
+            <button class="btn btn-primary custom-width" style="width: 50px" th:attr="onclick=|vote(55)|">55</button>&nbsp;
+            <button class="btn btn-primary custom-width" style="width: 50px" th:attr="onclick=|vote(89)|">89</button>
+        </div>
+    </div>
+    <br><br>
+    <div class="row" th:if="${#authentication.name == 'leader' and votes != null}">
+        <div class="col-md-12 d-flex justify-content-center">
+            <table id="dataTable">
+                <thead>
+                <tr>
+                    <th>user</th>
+                    <th>voted</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="vote : ${votes}">
+                    <td th:text="${vote.user}">user</td>
+                    <td th:text="${vote.score}">vote</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-12 d-flex justify-content-center " th:if="${#authentication.name == 'leader' and votes != null}">
+            <h6 th:text="'Average: '+${average}"></h6>&nbsp;&nbsp;&nbsp;&nbsp;<h6 th:text="'Most common: '+${mode}"></h6>
+        </div>
+    </div>
+    <br><br>
+    <div class="row">
+        <div class="col-md-12 d-flex justify-content-center " th:if="${#authentication.name == 'leader'}">
+            <button class="btn btn-primary" id="showButton">show scores</button>&nbsp;
+            <button class="btn btn-primary" id="downloadButton">download scores</button>
+        </div>
+    </div>
+</div>
+<script th:src="@{/webjars/jquery/jquery.min.js}"></script>
+<script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
+<script th:src="@{/webjars/sockjs-client/sockjs.js}"></script>
+<script th:src="@{/webjars/stomp-websocket/stomp.js}"></script>
+<script th:src="@{/webjars/datatables/js/jquery.dataTables.js}"></script>
+<script th:inline="javascript">
+    /*<![CDATA[*/
+
+    let socket = new SockJS('/ws');
+    let stompClient = Stomp.over(socket);
+
+    stompClient.connect({}, function(frame) {
+        stompClient.subscribe('/topic/redirect', function(message) {
+            if (message.body) {
+                window.location.replace(message.body); // Redirect to the new page
+            }
+        });
+    });
+
+    $(document).ready(function () {
+        $('#dataTable').DataTable({
+            "searching": false, // Disable searching
+            "ordering": false,  // Disable sorting
+            "paging": false,    // Disable pagination
+            "info": false
+        });
+    });
+
+    document.getElementById('downloadButton').addEventListener('click', function() {
+        window.open('/download-csv', '_blank');
+    });
+
+    document.getElementById('showButton').addEventListener('click', function() {
+        let id = [[${ticket.id}]];
+        let location = '/' + id + '/' + 'show';
+        window.location.replace(location);
+    });
+
+    function vote(score) {
+        let id = [[${ticket.id}]];
+        let location = '/vote/' + id + "/" + score;
+        console.log(location)
+        $.ajax({
+            url: location,
+            type: 'GET',
+            success: function () {
+                console.log('Request sent successfully');
+            },
+            error: function (xhr, status, error) {
+                console.error('Error with the request:', status, error);
+            }
+        });
+    }
+
+    document.getElementById('prevButton').addEventListener('click', function()  {
+        try {
+            let id = [[${previousTicket}]];
+            let location = '/' + id;
+            stompClient.send("/app/leaderAction", {}, location);
+        }
+        catch (e) {
+            console.log('No more tickets');
+        }
+    });
+
+    document.getElementById('nextButton').addEventListener('click', function()  {
+        try {
+            let id = [[${nextTicket}]];
+            let location = '/' + id;
+            stompClient.send("/app/leaderAction", {}, location);
+        }
+        catch (e) {
+            console.log('No more tickets');
+        }
+    });
+
+    /*]]>*/
+</script>
+</body>
+</html>
